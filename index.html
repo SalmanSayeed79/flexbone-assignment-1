@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScribeOCR | AI-Powered Text Extraction</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- PDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body {
+            background-color: #F8FAFC;
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
+            min-height: 100vh;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark body {
+            background-color: #0F172A;
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.5);
+        }
+
+        .tab-active {
+            color: #8b5cf6;
+            border-bottom: 2px solid #8b5cf6;
+        }
+
+        #ocrOutput::selection {
+            background: rgba(139, 92, 246, 0.3);
+        }
+    </style>
+</head>
+
+<body class="text-slate-900 dark:text-slate-200 font-sans selection:bg-primary-500/30 transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav
+        class="sticky top-0 z-50 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-black/5 dark:border-white/5 py-4 transition-colors">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-2 group cursor-pointer" onclick="window.location.reload()">
+                <div class="p-2 bg-primary-600 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+                    <i data-lucide="zap" class="w-6 h-6 text-white fill-current"></i>
+                </div>
+                <span
+                    class="text-2xl font-bold bg-gradient-to-r from-slate-900 to-primary-600 dark:from-white dark:to-primary-400 bg-clip-text text-transparent tracking-tight">
+                    ScribeOCR
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="#"
+                    class="hidden md:block text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Documentation</a>
+
+                <button id="themeToggle"
+                    class="p-2 glass-card hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    title="Toggle theme">
+                    <i data-lucide="sun" id="sunIcon" class="w-5 h-5 hidden dark:block"></i>
+                    <i data-lucide="moon" id="moonIcon" class="w-5 h-5 block dark:hidden"></i>
+                </button>
+
+                <a href="https://github.com/SalmanSayeed79/flexbone-assignment-1" target="_blank"
+                    class="p-2 glass-card hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <i data-lucide="github" class="w-5 h-5"></i>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Hero Section
+        <div class="text-center mb-16 animate-in fade-in slide-in-from-top-4 duration-700">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
+                AI-Powered <span
+                    class="bg-gradient-to-r from-primary-600 to-purple-600 dark:from-primary-400 dark:to-purple-400 bg-clip-text text-transparent">Text
+                    Extraction</span>
+            </h1>
+            <p class="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                Transform scanned documents and images into editable text instantly with ScribeOCR.
+                Powered by Google Cloud Vision for industry-leading accuracy.
+            </p>
+        </div> -->
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <!-- Left Column: Upload -->
+            <div class="col-span-1 lg:col-span-5 space-y-6">
+                <div class="glass-card p-8 group">
+                    <div class="p-2 bg-primary-500/10 dark:bg-primary-500/20 rounded-lg w-fit mb-4">
+                        <i data-lucide="image" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+                    </div>
+                    <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Source Image</h2>
+                </div>
+
+                <!-- Mode Toggle -->
+                <div
+                    class="flex bg-black/5 dark:bg-white/5 p-1 rounded-xl mb-6 border border-black/5 dark:border-white/5">
+                    <button id="singleModeBtn"
+                        class="flex-1 py-2 text-xs font-bold rounded-lg bg-primary-600 text-white shadow-lg transition-all">SINGLE</button>
+                    <button id="batchModeBtn"
+                        class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-all">BATCH</button>
+                </div>
+
+                <!-- Dropzone -->
+                <div id="dropzone"
+                    class="relative border-2 border-dashed border-black/10 dark:border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary-500/50 hover:bg-primary-500/5 transition-all duration-300 group/dropzone">
+
+                    <input type="file" id="fileInput" accept="image/*" class="hidden">
+
+                    <!-- Initial State -->
+                    <div id="uploadPrompt" class="text-center py-8">
+                        <div
+                            class="w-16 h-16 bg-black/5 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 mx-auto group-hover/dropzone:scale-110 group-hover/dropzone:bg-primary-500/20 transition-all duration-500">
+                            <i data-lucide="cloud-upload"
+                                class="w-8 h-8 text-slate-400 group-hover/dropzone:text-primary-400"></i>
+                        </div>
+                        <p class="text-slate-700 dark:text-slate-300 font-medium mb-1">Click or drag image here</p>
+                        <p class="text-sm text-slate-500" id="uploadSubtitle">Supports JPG, PNG (Max 5MB)</p>
+                    </div>
+
+                    <!-- Preview State -->
+                    <div id="previewContainer" class="hidden w-full flex-col items-center gap-4">
+                        <div id="singlePreview" class="w-full">
+                            <div
+                                class="relative w-full aspect-video rounded-xl overflow-hidden border border-black/10 dark:border-white/10 shadow-2xl">
+                                <img id="imagePreview" src="" class="w-full h-full object-cover">
+                                <button id="removeBtn"
+                                    class="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg backdrop-blur-sm transition-colors">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center mt-4">
+                                <span id="fileNameDisplay"
+                                    class="text-sm font-medium text-slate-700 dark:text-slate-300 truncate max-w-[200px]">image.jpg</span>
+                                <span id="fileSizeDisplay" class="text-xs text-slate-500">1.2 MB</span>
+                            </div>
+                        </div>
+                        <div id="batchPreview"
+                            class="hidden w-full space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                            <!-- Batch items will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <button id="processBtn" disabled
+                    class="w-full mt-6 py-4 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-primary-600/20 active:scale-[0.98]">
+                    <i data-lucide="wand-2" id="btnIcon" class="w-5 h-5"></i>
+                    <span id="btnText">Extract Text</span>
+                    <div id="btnLoader" class="hidden animate-spin">
+                        <i data-lucide="loader-2" class="w-5 h-5"></i>
+                    </div>
+                </button>
+
+                <!-- Confidence Indicator -->
+                <div id="confidenceContainer" class="hidden mt-6 pt-6 border-t border-black/5 dark:border-white/5">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">OCR Confidence</span>
+                        <span id="confidenceValue"
+                            class="text-sm font-bold text-primary-600 dark:text-primary-400">0%</span>
+                    </div>
+                    <div class="w-full h-2 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div id="confidenceBar" class="h-full bg-primary-500 transition-all duration-1000 ease-out"
+                            style="width: 0%"></div>
+                    </div>
+                </div>
+                <!-- API Settings (Collapsible) -->
+                <div class="glass-card p-6 mt-6">
+                    <button id="toggleSettings"
+                        class="w-full flex items-center justify-between text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                        <span class="text-sm font-medium">API Endpoint Settings</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300"
+                            id="settingsChevron"></i>
+                    </button>
+                    <div id="settingsContent" class="hidden mt-4 space-y-4">
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Endpoint
+                                URL</label>
+                            <input type="text" id="apiUrl" value="/ocr"
+                                class="w-full bg-black/5 dark:bg-black/20 border border-black/10 dark:border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-500/50 transition-colors text-slate-700 dark:text-slate-300">
+                            <p class="text-[10px] text-slate-500 mt-2">Leave as default unless using a remote server.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Results -->
+            <div class="col-span-1 lg:col-span-7 space-y-6">
+                <div class="glass-card flex flex-col h-[700px] overflow-hidden">
+                    <!-- Tabs -->
+                    <div class="flex border-b border-black/5 dark:border-white/5 px-6">
+                        <button data-tab="text" class="px-6 py-4 text-sm font-semibold transition-all tab-active"
+                            id="tab-text">
+                            Extracted Text
+                        </button>
+                        <button data-tab="metadata"
+                            class="px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all"
+                            id="tab-metadata">
+                            File Metadata
+                        </button>
+                        <button data-tab="batch"
+                            class="hidden px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all"
+                            id="tab-batch">
+                            Batch Summary
+                        </button>
+                    </div>
+
+                    <!-- Result Content -->
+                    <div class="flex-1 relative overflow-hidden">
+                        <!-- Text Area -->
+                        <div id="textContent" class="h-full p-6 animate-in fade-in duration-500">
+                            <div class="h-full w-full relative group">
+                                <textarea id="ocrOutput" readonly
+                                    placeholder="OCR results will appear here after processing..."
+                                    class="w-full h-full bg-transparent resize-none focus:outline-none font-mono text-sm leading-relaxed text-slate-700 dark:text-slate-300 custom-scrollbar"></textarea>
+
+                                <!-- Placeholder Message -->
+                                <div id="emptyResultMsg"
+                                    class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 pointer-events-none">
+                                    <i data-lucide="type" class="w-12 h-12 mb-4 opacity-20"></i>
+                                    <p class="text-center px-12">Waiting for image processing...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metadata Area -->
+                        <div id="metadataContent"
+                            class="hidden h-full p-6 animate-in fade-in duration-500 overflow-y-auto custom-scrollbar">
+                            <div id="metadataList" class="space-y-4">
+                                <!-- Example Metadata Item -->
+                                <div
+                                    class="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-600 py-20">
+                                    <i data-lucide="info" class="w-12 h-12 mb-4 opacity-20"></i>
+                                    <p>No metadata available yet.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Batch Area -->
+                        <div id="batchContent"
+                            class="hidden h-full p-6 animate-in fade-in duration-500 overflow-y-auto custom-scrollbar">
+                            <div id="batchResultsList" class="space-y-4">
+                                <div
+                                    class="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-600 py-20">
+                                    <i data-lucide="layers" class="w-12 h-12 mb-4 opacity-20"></i>
+                                    <p>Process a batch of images to see results here.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Bar -->
+                    <div
+                        class="bg-black/5 dark:bg-black/20 px-6 py-4 flex items-center justify-between border-t border-black/5 dark:border-white/5">
+                        <div class="flex items-center gap-2">
+                            <button id="copyBtn"
+                                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all border border-transparent hover:border-black/5 dark:hover:border-white/5"
+                                title="Copy to clipboard">
+                                <i data-lucide="copy" class="w-5 h-5"></i>
+                            </button>
+                            <button id="downloadBtn"
+                                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all border border-transparent hover:border-black/5 dark:hover:border-white/5"
+                                title="Download PDF">
+                                <i data-lucide="download" class="w-5 h-5"></i>
+                            </button>
+                            <div class="w-px h-6 bg-black/5 dark:bg-white/5 mx-2"></div>
+                            <button id="fullscreenBtn"
+                                class="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all border border-transparent hover:border-black/5 dark:hover:border-white/5"
+                                title="Fullscreen view">
+                                <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <button id="clearBtn"
+                            class="px-4 py-2 hover:bg-red-500/10 text-slate-500 hover:text-red-500 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-red-500/20">
+                            Clear Results
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="fullscreenModal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl"></div>
+        <div class="relative h-full flex flex-col max-w-5xl mx-auto p-6 md:p-12">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="text-2xl font-bold text-slate-900 dark:text-white">Full Extraction View</h3>
+                <div class="flex gap-4">
+                    <button id="modalCopy"
+                        class="flex items-center gap-2 px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors border border-black/10 dark:border-white/10 text-slate-700 dark:text-slate-300">
+                        <i data-lucide="copy" class="w-4 h-4"></i> Copy
+                    </button>
+                    <button id="closeModal"
+                        class="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors border border-red-500/20">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 glass-card p-8 overflow-y-auto custom-scrollbar">
+                <pre id="modalContent"
+                    class="font-mono text-base leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 z-[200] hidden animate-in slide-in-from-right-10">
+        <div
+            class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-semibold">
+            <div id="toastIconContainer" class="p-1 bg-green-500 rounded-full">
+                <i data-lucide="check" class="w-4 h-4 text-white"></i>
+            </div>
+            <span id="toastMsg">Action successful!</span>
+        </div>
+    </div>
+
+    <!-- Scripting -->
+    <script>
+        // Theme Logic
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+
+        // Initialize theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+
+        // Init Lucide
+        lucide.createIcons();
+
+        // State
+        let state = {
+            mode: 'single', // 'single' or 'batch'
+            file: null,
+            files: [],
+            isProcessing: false,
+            result: null, // Stores single result OR batch response
+            activeTab: 'text'
+        };
+
+        // DOM Elements
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+        const removeBtn = document.getElementById('removeBtn');
+        const processBtn = document.getElementById('processBtn');
+        const btnText = document.getElementById('btnText');
+        const btnIcon = document.getElementById('btnIcon');
+        const btnLoader = document.getElementById('btnLoader');
+        const ocrOutput = document.getElementById('ocrOutput');
+        const emptyResultMsg = document.getElementById('emptyResultMsg');
+        const metadataList = document.getElementById('metadataList');
+        const confidenceContainer = document.getElementById('confidenceContainer');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const confidenceBar = document.getElementById('confidenceBar');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fullscreenModal = document.getElementById('fullscreenModal');
+        const modalContent = document.getElementById('modalContent');
+        const closeModal = document.getElementById('closeModal');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const toggleSettings = document.getElementById('toggleSettings');
+        const settingsContent = document.getElementById('settingsContent');
+        const settingsChevron = document.getElementById('settingsChevron');
+        const apiUrlInput = document.getElementById('apiUrl');
+
+        // Event Listeners
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (state.mode === 'single') {
+                handleFile(e.target.files[0]);
+            } else {
+                handleBatchFiles(Array.from(e.target.files));
+            }
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-primary-500', 'bg-primary-500/10');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-primary-500', 'bg-primary-500/10');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-primary-500', 'bg-primary-500/10');
+            if (state.mode === 'single') {
+                handleFile(e.dataTransfer.files[0]);
+            } else {
+                handleBatchFiles(Array.from(e.dataTransfer.files));
+            }
+        });
+
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetUpload();
+        });
+
+        processBtn.addEventListener('click', () => {
+            if (state.mode === 'single') {
+                processOCR();
+            } else {
+                processBatchOCR();
+            }
+        });
+
+        // Mode Switching
+        const singleModeBtn = document.getElementById('singleModeBtn');
+        const batchModeBtn = document.getElementById('batchModeBtn');
+
+        singleModeBtn.addEventListener('click', () => {
+            state.mode = 'single';
+            singleModeBtn.classList.add('bg-primary-600', 'text-white', 'shadow-lg');
+            singleModeBtn.classList.remove('text-slate-500');
+            batchModeBtn.classList.remove('bg-primary-600', 'text-white', 'shadow-lg');
+            batchModeBtn.classList.add('text-slate-500');
+            fileInput.multiple = false;
+            document.getElementById('uploadSubtitle').textContent = 'Supports JPG, PNG (Max 5MB)';
+            document.getElementById('apiUrl').value = '/ocr';
+            resetUpload();
+        });
+
+        batchModeBtn.addEventListener('click', () => {
+            state.mode = 'batch';
+            batchModeBtn.classList.add('bg-primary-600', 'text-white', 'shadow-lg');
+            batchModeBtn.classList.remove('text-slate-500');
+            singleModeBtn.classList.remove('bg-primary-600', 'text-white', 'shadow-lg');
+            singleModeBtn.classList.add('text-slate-500');
+            fileInput.multiple = true;
+            document.getElementById('uploadSubtitle').textContent = 'Select multiple images (Max 20 images, 5MB each)';
+            document.getElementById('apiUrl').value = '/ocr-batch';
+            resetUpload();
+        });
+
+        // Tab Logic
+        document.querySelectorAll('[data-tab]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+                state.activeTab = tabName;
+
+                // Update UI
+                document.querySelectorAll('[data-tab]').forEach(t => {
+                    t.classList.remove('tab-active', 'text-slate-900', 'dark:text-slate-200');
+                    t.classList.add('text-slate-500', 'dark:text-slate-400');
+                });
+                tab.classList.add('tab-active');
+                tab.classList.remove('text-slate-500', 'dark:text-slate-400');
+
+                if (tabName === 'text') {
+                    document.getElementById('textContent').classList.remove('hidden');
+                    document.getElementById('metadataContent').classList.add('hidden');
+                    document.getElementById('batchContent').classList.add('hidden');
+                } else if (tabName === 'metadata') {
+                    document.getElementById('textContent').classList.add('hidden');
+                    document.getElementById('metadataContent').classList.remove('hidden');
+                    document.getElementById('batchContent').classList.add('hidden');
+                } else {
+                    document.getElementById('textContent').classList.add('hidden');
+                    document.getElementById('metadataContent').classList.add('hidden');
+                    document.getElementById('batchContent').classList.remove('hidden');
+                }
+            });
+        });
+
+        // Settings Toggle
+        toggleSettings.addEventListener('click', () => {
+            settingsContent.classList.toggle('hidden');
+            settingsChevron.classList.toggle('rotate-180');
+        });
+
+        // Actions
+        copyBtn.addEventListener('click', () => {
+            if (!ocrOutput.value) return;
+            copyToClipboard(ocrOutput.value);
+        });
+
+        document.getElementById('modalCopy').addEventListener('click', () => {
+            copyToClipboard(modalContent.textContent);
+        });
+
+        fullscreenBtn.addEventListener('click', () => {
+            if (!ocrOutput.value) return;
+            modalContent.textContent = ocrOutput.value;
+            fullscreenModal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        });
+
+        closeModal.addEventListener('click', () => {
+            fullscreenModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        });
+
+        downloadBtn.addEventListener('click', downloadAsPDF);
+
+        clearBtn.addEventListener('click', () => {
+            ocrOutput.value = '';
+            emptyResultMsg.classList.remove('hidden');
+            confidenceContainer.classList.add('hidden');
+            metadataList.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-slate-600 py-20">
+                    <i data-lucide="info" class="w-12 h-12 mb-4 opacity-20"></i>
+                    <p>No metadata available yet.</p>
+                </div>
+            `;
+            document.getElementById('batchResultsList').innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-slate-600 py-20">
+                    <i data-lucide="layers" class="w-12 h-12 mb-4 opacity-20"></i>
+                    <p>Process a batch of images to see results here.</p>
+                </div>
+            `;
+            document.getElementById('tab-batch').classList.add('hidden');
+            state.result = null;
+            lucide.createIcons();
+            showToast('Cleared results');
+        });
+
+        // Functions
+        function handleFile(file) {
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('Please upload an image file (PNG, JPG, etc)', 'error');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('File is too large (max 5MB)', 'error');
+                return;
+            }
+
+            state.file = file;
+            fileNameDisplay.textContent = file.name;
+            fileSizeDisplay.textContent = formatBytes(file.size);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                uploadPrompt.classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+                processBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleBatchFiles(files) {
+            if (!files || files.length === 0) return;
+
+            if (files.length > 20) {
+                showToast('Maximum 20 images allowed for batch processing', 'error');
+                files = files.slice(0, 20);
+            }
+
+            const validFiles = files.filter(f => {
+                if (!f.type.startsWith('image/')) {
+                    showToast(`File ${f.name} is not an image`, 'error');
+                    return false;
+                }
+                if (f.size > 5 * 1024 * 1024) {
+                    showToast(`File ${f.name} is too large`, 'error');
+                    return false;
+                }
+                return true;
+            });
+
+            if (validFiles.length === 0) return;
+
+            state.files = validFiles;
+
+            const batchPreview = document.getElementById('batchPreview');
+            const singlePreview = document.getElementById('singlePreview');
+
+            batchPreview.innerHTML = '';
+            singlePreview.classList.add('hidden');
+            batchPreview.classList.remove('hidden');
+            uploadPrompt.classList.add('hidden');
+            previewContainer.classList.remove('hidden');
+            processBtn.disabled = false;
+
+            validFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-3 p-3 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5';
+                item.innerHTML = `
+                    <div class="w-10 h-10 bg-primary-500/10 rounded-lg flex items-center justify-center overflow-hidden">
+                        <i data-lucide="image" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">${file.name}</p>
+                        <p class="text-[10px] text-slate-500">${formatBytes(file.size)}</p>
+                    </div>
+                    <button class="p-1 hover:bg-red-500/20 text-slate-400 hover:text-red-500 transition-colors" onclick="removeBatchFile(${index})">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                `;
+                batchPreview.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        window.removeBatchFile = (index) => {
+            state.files.splice(index, 1);
+            if (state.files.length === 0) {
+                resetUpload();
+            } else {
+                handleBatchFiles(state.files);
+            }
+        };
+
+        function resetUpload() {
+            state.file = null;
+            state.files = [];
+            fileInput.value = '';
+            uploadPrompt.classList.remove('hidden');
+            previewContainer.classList.add('hidden');
+            processBtn.disabled = true;
+            imagePreview.src = '';
+            document.getElementById('batchPreview').classList.add('hidden');
+            document.getElementById('singlePreview').classList.remove('hidden');
+        }
+
+        async function processOCR() {
+            if (!state.file || state.isProcessing) return;
+
+            setLoading(true);
+            const formData = new FormData();
+            formData.append('file', state.file);
+
+            const endpoint = apiUrlInput.value || 'http://localhost:8000/ocr';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'OCR Processing failed');
+                }
+
+                const data = await response.json();
+                state.result = data;
+
+                // Display text
+                if (data.text) {
+                    ocrOutput.value = data.text;
+                    emptyResultMsg.classList.add('hidden');
+
+                    // Display confidence
+                    if (data.confidence !== undefined) {
+                        confidenceContainer.classList.remove('hidden');
+                        confidenceValue.textContent = `${data.confidence}%`;
+                        setTimeout(() => {
+                            confidenceBar.style.width = `${data.confidence}%`;
+                        }, 100);
+                    }
+                } else {
+                    ocrOutput.value = '';
+                    emptyResultMsg.classList.remove('hidden');
+                    showToast(data.message || 'No text detected', 'info');
+                }
+
+                // Display metadata
+                if (data.metadata) {
+                    renderMetadata(data.metadata);
+                }
+
+                showToast('Extraction complete!');
+
+            } catch (err) {
+                console.error(err);
+                showToast(err.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function processBatchOCR() {
+            if (state.files.length === 0 || state.isProcessing) return;
+
+            setLoading(true);
+            const formData = new FormData();
+            state.files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            const endpoint = apiUrlInput.value || 'http://localhost:8000/ocr-batch';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Batch OCR Processing failed');
+                }
+
+                const data = await response.json();
+                state.result = data;
+
+                renderBatchResults(data.results);
+
+                document.getElementById('tab-batch').classList.remove('hidden');
+                document.getElementById('tab-batch').click();
+
+                showToast(`Processed ${data.successful_processed}/${data.total_processed} files successfully!`);
+
+            } catch (err) {
+                console.error(err);
+                showToast(err.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderBatchResults(results) {
+            const list = document.getElementById('batchResultsList');
+            list.innerHTML = '';
+
+            results.forEach((res, index) => {
+                const card = document.createElement('div');
+                card.className = 'glass-card p-4 hover:border-primary-500/30 transition-all cursor-pointer group';
+                card.onclick = () => selectBatchResult(index);
+
+                const isSuccess = res.message === 'Success' || res.message === 'No text found';
+                const statusColor = isSuccess ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+                const statusIcon = isSuccess ? 'check-circle' : 'alert-circle';
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="${statusIcon}" class="w-4 h-4 ${statusColor}"></i>
+                            <span class="text-sm font-semibold truncate max-w-[250px] text-slate-700 dark:text-slate-200">${res.filename}</span>
+                        </div>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-slate-500 dark:text-slate-400">${res.confidence}% Conf.</span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-500 line-clamp-2 italic">${res.text ? res.text.substring(0, 100) + '...' : res.message}</p>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function selectBatchResult(index) {
+            const res = state.result.results[index];
+
+            // Update Text Area
+            ocrOutput.value = res.text || '';
+            if (res.text) {
+                emptyResultMsg.classList.add('hidden');
+            } else {
+                emptyResultMsg.classList.remove('hidden');
+            }
+
+            // Update Confidence
+            if (res.confidence !== undefined) {
+                confidenceContainer.classList.remove('hidden');
+                confidenceValue.textContent = `${res.confidence}%`;
+                confidenceBar.style.width = `${res.confidence}%`;
+            } else {
+                confidenceContainer.classList.add('hidden');
+            }
+
+            // Update Metadata
+            if (res.metadata) {
+                renderMetadata(res.metadata);
+            } else {
+                metadataList.innerHTML = '<p class="text-center text-slate-500 py-10">No metadata for this file.</p>';
+            }
+
+            // Switch to Text Tab
+            document.getElementById('tab-text').click();
+            showToast(`Viewing result for ${res.filename}`, 'info');
+        }
+
+        function renderMetadata(meta) {
+            metadataList.innerHTML = '';
+
+            const createMetaRow = (label, value) => {
+                const div = document.createElement('div');
+                div.className = 'glass-card p-4 flex justify-between items-center border-black/5 dark:border-white/5';
+                div.innerHTML = `
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-widest">${label}</span>
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">${value}</span>
+                `;
+                return div;
+            };
+
+            // Main metadata
+            metadataList.appendChild(createMetaRow('Format', meta.format || 'N/A'));
+            metadataList.appendChild(createMetaRow('Dimensions', meta.width ? `${meta.width} × ${meta.height}` : 'N/A'));
+            metadataList.appendChild(createMetaRow('Color Mode', meta.mode || 'N/A'));
+            metadataList.appendChild(createMetaRow('File Size', meta.file_size_kb ? `${meta.file_size_kb} KB` : 'N/A'));
+
+            // EXIF
+            if (meta.exif && Object.keys(meta.exif).length > 0) {
+                const exifHeader = document.createElement('h4');
+                exifHeader.className = 'text-xs font-bold text-primary-400 uppercase tracking-widest pt-4 pb-2';
+                exifHeader.innerText = 'EXIF Data';
+                metadataList.appendChild(exifHeader);
+
+                for (const [key, value] of Object.entries(meta.exif)) {
+                    if (typeof value === 'object') continue;
+                    metadataList.appendChild(createMetaRow(key, value));
+                }
+            }
+        }
+
+        function setLoading(isLoading) {
+            state.isProcessing = isLoading;
+            processBtn.disabled = isLoading;
+
+            if (isLoading) {
+                btnText.textContent = 'Processing...';
+                btnIcon.classList.add('hidden');
+                btnLoader.classList.remove('hidden');
+                ocrOutput.classList.add('opacity-50');
+            } else {
+                btnText.textContent = 'Extract Text';
+                btnIcon.classList.remove('hidden');
+                btnLoader.classList.add('hidden');
+                ocrOutput.classList.remove('opacity-50');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const iconContainer = document.getElementById('toastIconContainer');
+
+            toastMsg.textContent = message;
+
+            if (type === 'error') {
+                iconContainer.className = 'p-1 bg-red-500 rounded-full';
+                iconContainer.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-white"></i>';
+            } else if (type === 'info') {
+                iconContainer.className = 'p-1 bg-blue-500 rounded-full';
+                iconContainer.innerHTML = '<i data-lucide="info" class="w-4 h-4 text-white"></i>';
+            } else {
+                iconContainer.className = 'p-1 bg-green-500 rounded-full';
+                iconContainer.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-white"></i>';
+            }
+
+            lucide.createIcons();
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied to clipboard!');
+            } catch (err) {
+                showToast('Failed to copy', 'error');
+            }
+        }
+
+        function downloadAsPDF() {
+            if (!ocrOutput.value) return;
+
+            const element = document.createElement('div');
+            element.style.padding = '40px';
+            element.style.fontFamily = 'monospace';
+            element.style.whiteSpace = 'pre-wrap';
+            element.innerHTML = `<h1 style="font-family: sans-serif; margin-bottom: 20px;">ScribeOCR Extraction Result</h1><hr style="margin-bottom: 20px;">` + ocrOutput.value;
+
+            const opt = {
+                margin: 1,
+                filename: `scribeocr_${new Date().getTime()}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+            showToast('PDF Download started');
+        }
+    </script>
+</body>
+
+</html>
